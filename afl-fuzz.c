@@ -71,6 +71,10 @@
 #include <graphviz/gvc.h>
 #include <math.h>
 
+// add xml parser by setsal
+#include "util.h"
+
+
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined (__OpenBSD__)
 #  include <sys/sysctl.h>
 #endif /* __APPLE__ || __FreeBSD__ || __OpenBSD__ */
@@ -8738,14 +8742,14 @@ int main(int argc, char** argv) {
   struct timeval tv;
   struct timezone tz;
 
-  SAYF(cCYA "afl-fuzz " cBRI VERSION cRST " by <lcamtuf@google.com>\n");
+  SAYF(cCYA "AFLNET " cBRI VERSION cRST " by <contact@setsal.dev>\n");
 
   doc_path = access(DOC_PATH, F_OK) ? "docs" : DOC_PATH;
 
   gettimeofday(&tv, &tz);
   srandom(tv.tv_sec ^ tv.tv_usec ^ getpid());
 
-  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:QN:D:W:w:P:KEq:s:RFc:")) > 0)
+  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:QN:D:W:w:P:KEq:s:RFc:z")) > 0)
 
     switch (opt) {
 
@@ -9010,8 +9014,11 @@ int main(int argc, char** argv) {
         cleanup_script = optarg;
         break;
 
-      default:
+      case 'z':
+        parse_yaml_config(optarg);
+        break;
 
+      default:
         usage(argv[0]);
 
     }
