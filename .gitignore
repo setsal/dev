@@ -24,3 +24,5 @@ afl-llvm-rt.o
 # User
 a.out
 util.o
+aflnet-fuzz
+s-fuzz

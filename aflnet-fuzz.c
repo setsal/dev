@@ -9011,10 +9011,6 @@ int main(int argc, char** argv) {
         cleanup_script = optarg;
         break;
 
-      case 'z':
-        parse_yaml_config(optarg);
-        break;
-
       default:
         usage(argv[0]);
 

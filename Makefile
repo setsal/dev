@@ -24,7 +24,7 @@ MISC_PATH   = $(PREFIX)/share/afl
 
 # PROGS intentionally omit afl-as, which gets installed elsewhere.
 
-PROGS       = afl-gcc afl-fuzz aflnet-replay afl-showmap afl-tmin afl-gotcpu afl-analyze
+PROGS       = afl-gcc afl-fuzz aflnet-replay afl-showmap afl-tmin afl-gotcpu afl-analyze aflnet-fuzz s-fuzz
 SH_PROGS    = afl-plot afl-cmin afl-whatsup
 
 CFLAGS     ?= -O3 -funroll-loops
@@ -69,8 +69,14 @@ afl-as: afl-as.c afl-as.h $(COMM_HDR) | test_x86
 	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
 	ln -sf afl-as as
 
-afl-fuzz: afl-fuzz.c $(COMM_HDR) aflnet.o aflnet.h util.o util.h | test_x86
-	$(CC) $(CFLAGS) $@.c aflnet.o util.o -o $@ $(LDFLAGS)
+afl-fuzz: afl-fuzz.c $(COMM_HDR) aflnet.o aflnet.h | test_x86
+	$(CC) $(CFLAGS) $@.c aflnet.o -o $@ $(LDFLAGS)
+
+aflnet-fuzz: aflnet-fuzz.c $(COMM_HDR) aflnet.o aflnet.h | test_x86
+	$(CC) $(CFLAGS) $@.c aflnet.o -o $@ $(LDFLAGS)
+
+s-fuzz: afl-fuzz.c $(COMM_HDR) aflnet.o aflnet.h util.o util.h | test_x86
+	$(CC) $(CFLAGS) $@.c aflnet.o util.o -o $@ $(LDFLAGS)	
 
 aflnet-replay: aflnet-replay.c $(COMM_HDR) aflnet.o aflnet.h | test_x86
 	$(CC) $(CFLAGS) $@.c aflnet.o -o $@ $(LDFLAGS)

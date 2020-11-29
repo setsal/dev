@@ -71,6 +71,9 @@
 #include <graphviz/gvc.h>
 #include <math.h>
 
+// add xml parser by setsal
+#include "util.h"
+
 
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined (__OpenBSD__)
 #  include <sys/sysctl.h>
