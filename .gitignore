@@ -26,3 +26,6 @@ a.out
 util.o
 aflnet-fuzz
 s-fuzz
+peda*
+.gdb*
+.vscode

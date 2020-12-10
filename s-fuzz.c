@@ -301,6 +301,8 @@ static u32 a_extras_cnt;              /* Total number of tokens available */
 
 static u8* (*post_handler)(u8* buf, u32* len);
 
+Conf conf;
+
 /* Interesting values, as per config.h */
 
 static s8  interesting_8[]  = { INTERESTING_8 };
@@ -8749,7 +8751,7 @@ int main(int argc, char** argv) {
   gettimeofday(&tv, &tz);
   srandom(tv.tv_sec ^ tv.tv_usec ^ getpid());
 
-  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:QN:D:W:w:P:KEq:s:RFc:z")) > 0)
+  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:QN:D:W:w:P:KEq:s:RFc:Z:")) > 0)
 
     switch (opt) {
 
@@ -9014,15 +9016,48 @@ int main(int argc, char** argv) {
         cleanup_script = optarg;
         break;
 
-      case 'z':
-        parse_yaml_config(optarg);
+      case 'Z':
+        if ( !optarg )
+          FATAL("Need input config file"); 
+        
+        parse_yaml_config(&conf, optarg);
+      
+        extras_dir = conf.fConf.dictionary;
+      
+        if (!strcmp(conf.iConf.protocol, "RTSP")) {
+          extract_requests = &extract_requests_rtsp;
+          extract_response_codes = &extract_response_codes_rtsp;
+        } else {
+          FATAL("%s protocol is not supported yet!", conf.iConf.protocol);
+        }
+
+    
+        if (!strcmp(conf.fConf.protocol, "tcp")) {
+          net_protocol = PRO_TCP;
+        } else if (!strcmp(conf.fConf.protocol, "udp")) {
+          net_protocol = PRO_UDP;
+        }
+
+        net_ip = conf.fConf.ip_address;
+        net_port = conf.fConf.port;
+        server_wait_usecs = conf.fConf.init_waitTime;
+        state_selection_algo = conf.fConf.state_selection_algo;
+        seed_selection_algo = conf.fConf.seed_selection_algo;
+        state_aware_mode = conf.fConf.state_aware_mode;
+        region_level_mutation = conf.fConf.region_level_mutation;
+        terminate_child = conf.fConf.terminate_child;
+
+        // FLAGS
+        server_wait = 1;
+        protocol_selected = 1;
+        use_net = 1;
         break;
 
       default:
         usage(argv[0]);
 
     }
-
+  
   if (optind == argc || !in_dir || !out_dir) usage(argv[0]);
 
   //AFLNet - Check for required arguments

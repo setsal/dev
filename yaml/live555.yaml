@@ -3,24 +3,21 @@ info:
   description: "This is an example of fuzzer linter of live555 protocol"
   version: "1.0.0"
   title: "Live555 protocol fuzzer config"
-  protocol: "RTSP"
-  contact:
-    email: "contact@setsal.dev"
+  info_protocol: "RTSP"
 fuzzer:
   dictionary: "/home/setsal/project/sqlab/fuzzer/myfuzzer/tutorials/live555/rtsp.dict"
   dirty_mode: true
-  aflnet:
-    server_info:
-      protocol: "tcp"
-      ip_address: "127.0.0.1"
-      port: "8554"
-    init_waitTime: "10000"
-    state_selection_algo: "3"
-    seed_selection_algo: "3"
-    region_level_mutation: true
-    state_aware_mode: true
+  fuzzer_protocol: "tcp"
+  ip_address: "127.0.0.1"
+  port: 8554
+  init_waitTime: 10000
+  state_selection_algo: 3
+  seed_selection_algo: 3
+  region_level_mutation: true
+  state_aware_mode: true
+  terminate_child: true
 protocol:
-  command:
+  command: '1111'
 externalDocs:
   description: "About RTSP"
   url: "https://en.wikipedia.org/wiki/Real_Time_Streaming_Protocol"

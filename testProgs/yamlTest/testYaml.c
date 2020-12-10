@@ -1,7 +1,84 @@
-#include "alloc-inl.h"
-#include "util.h"
+#include <yaml.h>
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include "alloc-inl.h"
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <assert.h>
+
+#define BUFFER_SIZE 65536
+#define MAX_DOCUMENTS  16
+
+
+typedef struct InfoConf {
+    char *description;
+    char *version;
+    char *title;
+    char *protocol;
+}InfoConf;
+
+typedef struct FuzzerConf {
+    u8 *dictionary;
+    u8 dirty_mode;
+    u32  init_waitTime;
+    u8 terminate_child;
+    u8 state_selection_algo;
+    u8 seed_selection_algo;
+    u8 region_level_mutation;
+    u8 state_aware_mode;
+    char *protocol;
+    u8 *ip_address;
+    u32 port;
+}FuzzerConf;
+
+typedef struct ServerConf {
+    char *protocol;
+    char *ip_address;
+    char *port;
+}ServerConf;
+
+typedef struct ProtocolConf {
+    char *command;
+}ProtocolConf;
+
+typedef struct Conf {
+    char *version;
+    struct InfoConf iConf;
+    struct FuzzerConf fConf;
+    struct ProtocolConf pConf;
+}Conf;
+
+
+/* Our example parser states. */
+enum state_value {
+    START,
+    ACCEPT_VERSION,
+    ACCEPT_INFO,
+    ACCEPT_FUZZER,
+    ACCEPT_PROTOCOL,
+    ACCEPT_SECTION,
+    ACCEPT_LIST,
+    ACCEPT_VALUES,
+    ACCEPT_KEY,
+    ACCEPT_VALUE,
+    STOP,
+    ERROR,
+};
+
+struct parser_state {
+    enum state_value state;
+    enum state_value cur_section;
+    int accepted;
+    int error;
+    char *key;
+    char *value;
+    struct Conf data;
+};
+
 
 int consume_event(struct parser_state *s, yaml_event_t *event)
 {
@@ -185,9 +262,6 @@ int consume_event(struct parser_state *s, yaml_event_t *event)
             else if (strcmp(s->key, "state_aware_mode") == 0) {
                 s->data.fConf.state_aware_mode = (strcmp(s->value, "true") == 0) ? 1 : 0;
             }
-            else if (strcmp(s->key, "terminate_child") == 0) {
-                s->data.fConf.terminate_child = (strcmp(s->value, "true") == 0) ? 1 : 0;
-            }            
             else {
                 fprintf(stderr, "Ignoring unknown key: %s\n", s->key);
             }
@@ -208,15 +282,18 @@ int consume_event(struct parser_state *s, yaml_event_t *event)
     return (s->state == ERROR ? 0 : 1);
 }
 
-// parse yaml
-int parse_yaml_config(Conf *conf, char *path) {
+
+
+int main(int argc, char *argv[]) {
 
     // read yaml file
-    FILE *file = fopen(path, "r");
+    FILE *file = fopen(argv[1], "r");
     assert(file);
 
     yaml_parser_t parser;
     yaml_event_t event;
+
+    char *array[128] = { NULL };
     
     // parser yaml text
     assert(yaml_parser_initialize(&parser));
@@ -225,6 +302,7 @@ int parse_yaml_config(Conf *conf, char *path) {
 
     // malloc yaml
     struct parser_state state = {.state=START, .accepted=0, .error=0};
+    Conf conf;
 
     do {
         if (!yaml_parser_parse(&parser, &event)) {
@@ -236,27 +314,24 @@ int parse_yaml_config(Conf *conf, char *path) {
         if (state.accepted) {
             switch(state.cur_section) {
                 case ACCEPT_VERSION:
-                    conf->version = state.data.version;
+                    conf.version = state.data.version;
                 break;
                 case ACCEPT_INFO:
-                    conf->iConf.description = state.data.iConf.description;
-                    conf->iConf.version = state.data.iConf.version;
-                    conf->iConf.title = state.data.iConf.title;
-                    conf->iConf.protocol = state.data.iConf.protocol;                
+                    conf.iConf.description = state.data.iConf.description;
+                    conf.iConf.version = state.data.iConf.version;
+                    conf.iConf.title = state.data.iConf.title;
+                    conf.iConf.protocol = state.data.iConf.protocol;                
                 break;
                 case ACCEPT_FUZZER:
-                    conf->fConf.dictionary = state.data.fConf.dictionary;
-                    conf->fConf.dirty_mode = state.data.fConf.dirty_mode;
-                    conf->fConf.protocol = state.data.fConf.protocol;
-                    conf->fConf.ip_address = state.data.fConf.ip_address;
-                    conf->fConf.port = state.data.fConf.port;
-                    conf->fConf.init_waitTime = state.data.fConf.init_waitTime;
-                    conf->fConf.state_selection_algo = state.data.fConf.state_selection_algo;
-                    conf->fConf.region_level_mutation = state.data.fConf.region_level_mutation;
-                    conf->fConf.state_aware_mode = state.data.fConf.state_aware_mode;
-                    conf->fConf.terminate_child = state.data.fConf.terminate_child;
-                break;
-                default:
+                    conf.fConf.dictionary = state.data.fConf.dictionary;
+                    conf.fConf.dirty_mode = state.data.fConf.dirty_mode;
+                    conf.fConf.protocol = state.data.fConf.protocol;
+                    conf.fConf.ip_address = state.data.fConf.ip_address;
+                    conf.fConf.port = state.data.fConf.port;
+                    conf.fConf.init_waitTime = state.data.fConf.init_waitTime;
+                    conf.fConf.state_selection_algo = state.data.fConf.state_selection_algo;
+                    conf.fConf.region_level_mutation = state.data.fConf.region_level_mutation;
+                    conf.fConf.state_aware_mode = state.data.fConf.state_aware_mode;
                 break;
             }
         }

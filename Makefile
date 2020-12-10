@@ -24,7 +24,7 @@ MISC_PATH   = $(PREFIX)/share/afl
 
 # PROGS intentionally omit afl-as, which gets installed elsewhere.
 
-PROGS       = afl-gcc afl-fuzz aflnet-replay afl-showmap afl-tmin afl-gotcpu afl-analyze aflnet-fuzz s-fuzz
+PROGS       = afl-gcc afl-fuzz aflnet-replay afl-showmap afl-tmin afl-gotcpu afl-analyze aflnet-fuzz
 SH_PROGS    = afl-plot afl-cmin afl-whatsup
 
 CFLAGS     ?= -O3 -funroll-loops
@@ -32,8 +32,9 @@ CFLAGS     += -Wall -D_FORTIFY_SOURCE=2 -g -Wno-pointer-sign -Wno-unused-result 
 	      -DAFL_PATH=\"$(HELPER_PATH)\" -DDOC_PATH=\"$(DOC_PATH)\" \
 	      -DBIN_PATH=\"$(BIN_PATH)\"
 
+
 ifneq "$(filter Linux GNU%,$(shell uname))" ""
-  LDFLAGS  += -ldl -lgvc -lcgraph -lm
+  LDFLAGS  += -ldl -lgvc -lcgraph -lm 
 endif
 
 ifeq "$(findstring clang, $(shell $(CC) --version 2>/dev/null))" ""
@@ -75,8 +76,8 @@ afl-fuzz: afl-fuzz.c $(COMM_HDR) aflnet.o aflnet.h | test_x86
 aflnet-fuzz: aflnet-fuzz.c $(COMM_HDR) aflnet.o aflnet.h | test_x86
 	$(CC) $(CFLAGS) $@.c aflnet.o -o $@ $(LDFLAGS)
 
-s-fuzz: afl-fuzz.c $(COMM_HDR) aflnet.o aflnet.h util.o util.h | test_x86
-	$(CC) $(CFLAGS) $@.c aflnet.o util.o -o $@ $(LDFLAGS)	
+s-fuzz: s-fuzz.c $(COMM_HDR) aflnet.o aflnet.h util.o util.h | test_x86
+	$(CC) $(CFLAGS) $@.c util.o aflnet.o -o $@ $(LDFLAGS) -lyaml
 
 aflnet-replay: aflnet-replay.c $(COMM_HDR) aflnet.o aflnet.h | test_x86
 	$(CC) $(CFLAGS) $@.c aflnet.o -o $@ $(LDFLAGS)
@@ -120,7 +121,7 @@ all_done: test_build
 .NOTPARALLEL: clean
 
 clean:
-	rm -f $(PROGS) afl-as as afl-g++ afl-clang afl-clang++ *.o *~ a.out core core.[1-9][0-9]* *.stackdump test .test test-instr .test-instr0 .test-instr1 qemu_mode/qemu-2.10.0.tar.bz2 afl-qemu-trace
+	rm -f $(PROGS) afl-as as afl-g++ afl-clang afl-clang++ *.o *~ a.out core core.[1-9][0-9]* *.stackdump test .test test-instr .test-instr0 .test-instr1 qemu_mode/qemu-2.10.0.tar.bz2 afl-qemu-trace s-fuzz aflnet-fuzz
 	rm -rf out_dir qemu_mode/qemu-2.10.0
 	$(MAKE) -C llvm_mode clean
 	$(MAKE) -C libdislocator clean
