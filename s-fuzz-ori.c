@@ -423,9 +423,9 @@ void setup_ipsm()
   agattr(ipsm, AGNODE, "color", "black"); //Default node colr is black
   agattr(ipsm, AGEDGE, "color", "black"); //Default edge color is black
 
-  khs_ipsm_paths = kh_init(hs32); // set
+  khs_ipsm_paths = kh_init(hs32);
 
-  khms_states = kh_init(hms);  // map?
+  khms_states = kh_init(hms);
 }
 
 /* Free memory allocated to state-machine variables */
@@ -6978,6 +6978,13 @@ havoc_stage:
 
   }
 
+  /* change hovoc start point */
+  u8 *havoc_outbuf;
+  u32 customize_shift_size = 16;  // testing
+  havoc_outbuf = ck_alloc_nozero(customize_shift_size);
+  memcpy(havoc_outbuf, out_buf, customize_shift_size);
+
+
   if (stage_max < HAVOC_MIN) stage_max = HAVOC_MIN;
 
   temp_len = len;
@@ -9121,7 +9128,7 @@ int main(int argc, char** argv) {
   setup_shm();
   init_count_class16();
 
-  setup_ipsm(); // add by aflnet
+  setup_ipsm();
 
   setup_dirs_fds();
   read_testcases();
