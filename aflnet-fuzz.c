@@ -1093,8 +1093,10 @@ HANDLE_RESPONSES:
   //wait a bit letting the server to complete its remaining task(s)
   memset(session_virgin_bits, 255, MAP_SIZE);
   while(1) {
+    // ACTF("[send_over_network] %d", has_new_bits(session_virgin_bits));
     if (has_new_bits(session_virgin_bits) != 2) break;
   }
+  // ACTF("[send_over_network2] %d", has_new_bits(session_virgin_bits));
 
   close(sockfd);
 
@@ -4759,7 +4761,7 @@ static void check_term_size(void);
    execve() calls, plus in several other circumstances. */
 
 static void show_stats(void) {
-
+  return;
   static u64 last_stats_ms, last_plot_ms, last_ms, last_execs;
   static double avg_exec;
   double t_byte_ratio, stab_ratio;

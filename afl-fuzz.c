@@ -4022,11 +4022,13 @@ static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
     /* Keep only if there are new bits in the map, add to queue for
        future fuzzing, etc. */
 
-    if (!(hnb = has_new_bits(virgin_bits))) {
-      if (crash_mode) total_crashes++;
-      return 0;
-    }
+    // setsal comment
+    // if (!(hnb = has_new_bits(virgin_bits))) {
+    //   if (crash_mode) total_crashes++;
+    //   return 0;
+    // }
 
+    hnb = 0;
 #ifndef SIMPLE_FILES
 
     fn = alloc_printf("%s/queue/id:%06u,%s", out_dir, queued_paths,
@@ -4080,8 +4082,8 @@ static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
 
     keeping = 1;
     
-    // setsal 
-    keeping = 0;
+    // setsal ( no use? )
+    // keeping = 0;
 
   }
 
