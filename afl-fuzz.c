@@ -4885,7 +4885,7 @@ static void show_stats(void) {
 
   sprintf(tmp + banner_pad, "%s " cLCY VERSION cLGN
           " (%s)",  crash_mode ? cPIN "peruvian were-rabbit" :
-          cYEL "american fuzzy lop", use_banner);
+          cYEL "AFLDEV", use_banner);
 
   SAYF("\n%s\n\n", tmp);
 
@@ -8739,7 +8739,7 @@ int main(int argc, char** argv) {
   struct timeval tv;
   struct timezone tz;
 
-  SAYF(cCYA "AFLNET " cBRI VERSION cRST " by <contact@setsal.dev>\n");
+  SAYF(cCYA "AFLDEV " cBRI VERSION cRST " by <contact@setsal.dev>\n");
 
   doc_path = access(DOC_PATH, F_OK) ? "docs" : DOC_PATH;
 
