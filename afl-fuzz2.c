@@ -449,7 +449,7 @@ u32 get_state_index(u32 state_id) {
 /* Expand the size of the map when a new seed or a new state has been discovered */
 void expand_was_fuzzed_map(u32 new_states, u32 new_qentries) {
 
-  ACTF("[expand_was_fuzzed_map]: fuzzed_map_states: %d, fuzzed_map_qentries: %d", fuzzed_map_states, fuzzed_map_qentries);
+  // ACTF("[expand_was_fuzzed_map]: fuzzed_map_states: %d, fuzzed_map_qentries: %d", fuzzed_map_states, fuzzed_map_qentries);
   int i, j;
   //Realloc the memory
   was_fuzzed_map = (char **)ck_realloc(was_fuzzed_map, (fuzzed_map_states + new_states) * sizeof(char *));
@@ -478,7 +478,7 @@ u32 get_unique_state_count(unsigned int *state_sequence, unsigned int state_coun
 
   for (i = 0; i < state_count; i++) {
     state_id = state_sequence[i];
-    ACTF("[get_unique_state_count]: state_id: %d", state_id);
+    // ACTF("[get_unique_state_count]: state_id: %d", state_id);
 
     if (kh_get(hs32, khs_state_ids, state_id) != kh_end(khs_state_ids)) {
       continue;
@@ -489,7 +489,7 @@ u32 get_unique_state_count(unsigned int *state_sequence, unsigned int state_coun
   }
 
   kh_destroy(hs32, khs_state_ids);
-  ACTF("[get_unique_state_count]: result %d", result);
+  // ACTF("[get_unique_state_count]: result %d", result);
   return result;
 }
 
@@ -508,12 +508,12 @@ u8 is_state_sequence_interesting(unsigned int *state_sequence, unsigned int stat
 
 
   for ( i=0; i<count; i++ ) {
-    ACTF("[is_state_sequence_interesting] trimmed_state_sequence[%d]: %d", i, trimmed_state_sequence[i]);
+    // ACTF("[is_state_sequence_interesting] trimmed_state_sequence[%d]: %d", i, trimmed_state_sequence[i]);
   }
 
   //Calculate the hash based on the shortened state sequence
   u32 hashKey = hash32(trimmed_state_sequence, count * sizeof(unsigned int), 0);
-  ACTF("[is_state_sequence_interesting] %d", hashKey);
+  // ACTF("[is_state_sequence_interesting] %d", hashKey);
   if (trimmed_state_sequence) free(trimmed_state_sequence);
 
   if (kh_get(hs32, khs_ipsm_paths, hashKey) != kh_end(khs_ipsm_paths)) {
@@ -530,10 +530,9 @@ void update_region_annotations(struct queue_entry* q)
 { 
   u32 i = 0;
   u32 j = 0;
-  ACTF("[update_region_annotations] message_sent: %d", messages_sent);
+  // ACTF("[update_region_annotations] message_sent: %d", messages_sent);
   for (i = 0; i < messages_sent; i++) {
-    ACTF("");
-    ACTF("[update_region_annotations]: response_bytes[%d]: %d", i, response_bytes[i]);
+    // ACTF("[update_region_annotations]: response_bytes[%d]: %d", i, response_bytes[i]);
     if ((response_bytes[i] == 0) || ( i > 0 && (response_bytes[i] - response_bytes[i - 1] == 0))) {
       q->regions[i].state_sequence = NULL;
       q->regions[i].state_count = 0;
@@ -542,7 +541,7 @@ void update_region_annotations(struct queue_entry* q)
       q->regions[i].state_sequence = (*extract_response_codes)(response_buf, response_bytes[i], &state_count);
 
       for (j=0; j<state_count; j++) {
-        ACTF("[update_region_annotattions] region.state_sequence: %d", q->regions[i].state_sequence[j]);
+        // ACTF("[update_region_annotattions] region.state_sequence: %d", q->regions[i].state_sequence[j]);
       }
 
       q->regions[i].state_count = state_count;
@@ -592,18 +591,18 @@ void update_fuzzs() {
   khint_t k;
   khs_state_ids = kh_init(hs32);
 
-  ACTF("[update fuzz]: %d", state_count);
+  // ACTF("[update fuzz]: %d", state_count);
 
   for(i = 0; i < state_count; i++) {
     unsigned int state_id = state_sequence[i];
-    ACTF("[update fuzz]: state_id: %d", state_id);
+    // ACTF("[update fuzz]: state_id: %d", state_id);
     
   
     if (kh_get(hs32, khs_state_ids, state_id) != kh_end(khs_state_ids)) {
-      ACTF("[update fuzz]: continue");
+      // ACTF("[update fuzz]: continue");
       continue;
     } else {
-      ACTF("[update fuzz]: put state_id: %d", state_id);
+      // ACTF("[update fuzz]: put state_id: %d", state_id);
       kh_put(hs32, khs_state_ids, state_id, &discard);
       k = kh_get(hms, khms_states, state_id);
       if (k != kh_end(khms_states)) {
@@ -797,14 +796,14 @@ void update_state_aware_variables(struct queue_entry *q, u8 dry_run)
 
   q->unique_state_count = get_unique_state_count(state_sequence, state_count);
 
-  ACTF("[update_state_aware_variables]");
+  // ACTF("[update_state_aware_variables]");
 
   if (is_state_sequence_interesting(state_sequence, state_count)) {
 
-    ACTF("[update_state_aware_variables] is_interesting");
+    // ACTF("[update_state_aware_variables] is_interesting");
     //Save the current kl_messages to a file which can be used to replay the newly discovered paths on the ipsm
     u8 *temp_str = state_sequence_to_string(state_sequence, state_count);
-    ACTF("[update_state_aware_variables] temp_str: %s", temp_str);
+    // ACTF("[update_state_aware_variables] temp_str: %s", temp_str);
     u8 *fname = alloc_printf("%s/replayable-new-ipsm-paths/id:%s:%s", out_dir, temp_str, dry_run ? basename(q->fname) : "new");
     save_kl_messages_to_file(kl_messages, fname, 1, messages_sent);
     ck_free(temp_str);
@@ -819,7 +818,7 @@ void update_state_aware_variables(struct queue_entry *q, u8 dry_run)
         char fromState[STATE_STR_LEN], toState[STATE_STR_LEN];
         snprintf(fromState, STATE_STR_LEN, "%d", prevStateID);
         snprintf(toState, STATE_STR_LEN, "%d", curStateID);
-        ACTF("[update_state_aware_variables] fromState: %s -> toState: %s", fromState, toState);
+        // ACTF("[update_state_aware_variables] fromState: %s -> toState: %s", fromState, toState);
 
         //Check if the prevStateID and curStateID have been added to the state machine as vertices
         //Check also if the edge prevStateID->curStateID has been added
@@ -827,7 +826,7 @@ void update_state_aware_variables(struct queue_entry *q, u8 dry_run)
 		    Agedge_t *edge;
 		    from = agnode(ipsm, fromState, FALSE);
 		    if (!from) {
-          ACTF("add node to from");
+          // ACTF("add node to from");
           //Add a node to the graph
           from = agnode(ipsm, fromState, TRUE);
           if (dry_run) agset(from,"color","blue");
@@ -849,7 +848,7 @@ void update_state_aware_variables(struct queue_entry *q, u8 dry_run)
           k = kh_put(hms, khms_states, prevStateID, &discard);
           kh_value(khms_states, k) = newState_From;
 
-          ACTF("[update_state_aware_variables]: state_ids_count: %d, prevStateID: %d", state_ids_count, prevStateID);
+          // ACTF("[update_state_aware_variables]: state_ids_count: %d, prevStateID: %d", state_ids_count, prevStateID);
 
           //Insert this into the state_ids array too
           state_ids = (u32 *) ck_realloc(state_ids, (state_ids_count + 1) * sizeof(u32));
@@ -861,7 +860,7 @@ void update_state_aware_variables(struct queue_entry *q, u8 dry_run)
 
 		    to = agnode(ipsm, toState, FALSE);
 		    if (!to) {
-          ACTF("add node to to");
+          // ACTF("add node to to");
           //Add a node to the graph
           to = agnode(ipsm, toState, TRUE);
           if (dry_run) agset(to,"color","blue");
@@ -883,7 +882,7 @@ void update_state_aware_variables(struct queue_entry *q, u8 dry_run)
           k = kh_put(hms, khms_states, curStateID, &discard);
           kh_value(khms_states, k) = newState_To;
 
-          ACTF("[update_state_aware_variables2]: state_ids_count: %d, curStateID: %d", state_ids_count, curStateID);
+          // ACTF("[update_state_aware_variables2]: state_ids_count: %d, curStateID: %d", state_ids_count, curStateID);
           //Insert this into the state_ids array too
           state_ids = (u32 *) ck_realloc(state_ids, (state_ids_count + 1) * sizeof(u32));
           state_ids[state_ids_count++] = curStateID;
@@ -1639,7 +1638,7 @@ static void add_to_queue(u8* fname, u32 len, u8 passed_det) {
     q_prev100 = q;
 
   }
-  ACTF("[add_to_queue]: corpus_read_or_sync: %d", corpus_read_or_sync);
+  // ACTF("[add_to_queue]: corpus_read_or_sync: %d", corpus_read_or_sync);
   /* AFLNet: extract regions keeping client requests if needed */
   if (corpus_read_or_sync) {
     FILE *fp;
@@ -1662,20 +1661,20 @@ static void add_to_queue(u8* fname, u32 len, u8 passed_det) {
 
   } else {
     //Convert the linked list kl_messages to regions
-    ACTF("[add_to_queue]: region_count: %d, message_sent: %d", q->region_count, messages_sent);
+    // ACTF("[add_to_queue]: region_count: %d, message_sent: %d", q->region_count, messages_sent);
     q->regions = convert_kl_messages_to_regions(kl_messages, &q->region_count, messages_sent);
   }
-  ACTF("[add_to_queue]: region_count: %d, message_sent: %d", q->region_count, messages_sent);
+  // ACTF("[add_to_queue]: region_count: %d, message_sent: %d", q->region_count, messages_sent);
 
   /* save the regions' information to file for debugging purpose */
   u8 *fn = alloc_printf("%s/regions/%s", out_dir, basename(fname));
-  ACTF("[add_to_queue]: fn: %s", fn);
+  // ACTF("[add_to_queue]: fn: %s", fn);
   save_regions_to_file(q->regions, q->region_count, fn);
   ck_free(fn);
 
   last_path_time = get_cur_time();
 
-  ACTF("[add_to_queue]: fuzzed_map_states: %d", fuzzed_map_states);
+  // ACTF("[add_to_queue]: fuzzed_map_states: %d", fuzzed_map_states);
 
   //Add a new column to the was_fuzzed map
   if (fuzzed_map_states) {
@@ -3451,7 +3450,7 @@ static u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
     u32 cksum;
 
     // setsal
-    // if (!first_run && !(stage_cur % stats_update_freq)) show_stats();
+    if (!first_run && !(stage_cur % stats_update_freq)) show_stats();
 
     write_to_testcase(use_mem, q->len);
 
@@ -3552,7 +3551,7 @@ abort_calibration:
   stage_max  = old_sm;
 
   // setsal
-  // if (!first_run) show_stats();
+  if (!first_run) show_stats();
 
   return fault;
 
@@ -4016,7 +4015,7 @@ static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
   //s32 fd;
   u8  keeping = 0, res;
 
-  ACTF("[save_if_interesting] fault: %d, crash_mode %d", fault, crash_mode);
+  // ACTF("[save_if_interesting] fault: %d, crash_mode %d", fault, crash_mode);
 
   if (fault == crash_mode) {
 
@@ -4033,8 +4032,8 @@ static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
     fn = alloc_printf("%s/queue/id:%06u,%s", out_dir, queued_paths,
                       describe_op(hnb));
 
-    ACTF("%s/queue/id:%06u,%s", out_dir, queued_paths,
-                      describe_op(hnb));
+    // ACTF("%s/queue/id:%06u,%s", out_dir, queued_paths,
+    //                   describe_op(hnb));
     // ACTF("%s", fn);
 
 #else
@@ -4045,9 +4044,9 @@ static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
 
 
     
-    // ACTF("[save_if_interesting] message_sent: %d", messages_sent);
+    // // ACTF("[save_if_interesting] message_sent: %d", messages_sent);
     u32 full_len = save_kl_messages_to_file(kl_messages, fn, 0, messages_sent);
-    ACTF("[save_if_interesting] full_len: %d", full_len);
+    // ACTF("[save_if_interesting] full_len: %d", full_len);
     
 
     /* We use the actual length of all messages (full_len), not the len of the mutated message subsequence (len)*/
@@ -5440,7 +5439,7 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
   }
 
   write_to_testcase(out_buf, len);
-  ACTF("[common_fuzz_stuff]: %d %s", len, out_buf);
+  // ACTF("[common_fuzz_stuff]: %d %s", len, out_buf);
   // PFATAL("STOP");
 
   /* AFLNet update kl_messages linked list */
@@ -5458,7 +5457,7 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
   // for (it = kl_begin(kl_messages); it != kl_end(kl_messages); it = kl_next(it)) {    
   //   myCnt++;
   // }
-  ACTF("[Before extract] In link list: %ld", kl_messages->size);
+  // ACTF("[Before extract] In link list: %ld", kl_messages->size);
 
 
   // update kl_messages linked list
@@ -5466,7 +5465,7 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
   kliter_t(lms) *prev_last_message, *cur_last_message;
   prev_last_message = get_last_message(kl_messages);
 
-  ACTF("[Before extract] new region_count: %d", region_count);
+  // ACTF("[Before extract] new region_count: %d", region_count);
 
   // limit the #messages based on max_seed_region_count to reduce overhead
   for (i = 0; i < region_count; i++) {
@@ -5519,7 +5518,7 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
     // for (it = kl_begin(kl_messages); it != kl_end(kl_messages); it = kl_next(it)) {    
     //   myCnt2++;
     // }
-    ACTF("[After extract] In link list: %ld", kl_messages->size);
+    // ACTF("[After extract] In link list: %ld", kl_messages->size);
   
 
   } else {
@@ -5581,8 +5580,8 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
 
 
   // setsal tmp
-  // if (!(stage_cur % stats_update_freq) || stage_cur + 1 == stage_max)
-  //   show_stats();
+  if (!(stage_cur % stats_update_freq) || stage_cur + 1 == stage_max)
+    show_stats();
 
   return 0;
 
@@ -5971,8 +5970,8 @@ AFLNET_REGIONS_SELECTION:;
     if (total_region == 0) PFATAL("0 region found for %s", queue_cur->fname);
     
     
-    ACTF("target_state_id: %d",  target_state_id );
-    ACTF("total_region: %d",  total_region);
+    // ACTF("target_state_id: %d",  target_state_id );
+    // ACTF("total_region: %d",  total_region);
 
     if (target_state_id == 0) {
       //No prefix subsequence (M1 is empty)
@@ -5982,13 +5981,13 @@ AFLNET_REGIONS_SELECTION:;
       //To compute M2_region_count, we identify the first region which has a different annotation
       //Now we quickly compare the state count, we could make it more fine grained by comparing the exact response codes
       for(i = 0; i < queue_cur->region_count ; i++) {
-        ACTF("queue_cur->regions[%d].state_count: %d, start_byte: %d, end_byte: %d",  i, queue_cur->regions[i].state_count, queue_cur->regions[i].start_byte, queue_cur->regions[i].end_byte);
+        // ACTF("queue_cur->regions[%d].state_count: %d, start_byte: %d, end_byte: %d",  i, queue_cur->regions[i].state_count, queue_cur->regions[i].start_byte, queue_cur->regions[i].end_byte);
         if (queue_cur->regions[i].state_count != queue_cur->regions[0].state_count) break;
         M2_region_count++;
       }
 
-      ACTF("M2_region_count: %d",  M2_region_count);
-       ACTF("M2_start_region_ID: %d",  M2_start_region_ID);
+      // ACTF("M2_region_count: %d",  M2_region_count);
+      //  ACTF("M2_start_region_ID: %d",  M2_start_region_ID);
     } else {
       //M1 is unlikely to be empty
       M2_start_region_ID = 0;
@@ -6049,14 +6048,13 @@ AFLNET_REGIONS_SELECTION:;
     count++;
   }
 
-  ACTF("count: %d", count);
+  // ACTF("count: %d", count);
   
 
 
   /* Construct the buffer to be mutated and update out_buf */
   if (M2_prev == NULL) {
     it = kl_begin(kl_messages);
-    ACTF("???");
   } else {
     it = kl_next(M2_prev);
   }
@@ -6083,8 +6081,8 @@ AFLNET_REGIONS_SELECTION:;
   //Save the len for later use
   M2_len = len;
 
-  ACTF("[After 0] in_buf: %s", in_buf);  
-  ACTF("[After 0-1] len: %d, in_buf: %s", len, out_buf);  
+  // ACTF("[After 0] in_buf: %s", in_buf);  
+  // ACTF("[After 0-1] len: %d, in_buf: %s", len, out_buf);  
 
   /*********************
    * PERFORMANCE SCORE *
@@ -7562,10 +7560,10 @@ havoc_stage:
 
       }
 
-    // ACTF("[after1] templen: %d, out_buf: %s ", temp_len, out_buf);
+    // // ACTF("[after1] templen: %d, out_buf: %s ", temp_len, out_buf);
 
     }
-    // ACTF("[after1]: templen: %d, end", temp_len);
+    // // ACTF("[after1]: templen: %d, end", temp_len);
 
     if (common_fuzz_stuff(argv, out_buf, temp_len)) {   // in havoc
       goto abandon_entry;
@@ -7578,7 +7576,7 @@ havoc_stage:
     if (temp_len < len) out_buf = ck_realloc(out_buf, len);
     temp_len = len;
     memcpy(out_buf, in_buf, len);
-    // ACTF("[after2] len:%d, out_buf: %s ", len, out_buf);
+    // // ACTF("[after2] len:%d, out_buf: %s ", len, out_buf);
     // PFATAL("STOP");
 
     /* If we're finding new stuff, let's run for a bit longer, limits
@@ -9373,7 +9371,7 @@ int main(int argc, char** argv) {
   }
 
   // setsal
-  // if (queue_cur) show_stats();
+  if (queue_cur) show_stats();
 
   /* If we stopped programmatically, we kill the forkserver and the current runner.
      If we stopped manually, this is done by the signal handler. */
