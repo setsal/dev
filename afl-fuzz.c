@@ -507,9 +507,9 @@ u8 is_state_sequence_interesting(unsigned int *state_sequence, unsigned int stat
   }
 
 
-  for ( i=0; i<count; i++ ) {
-    // ACTF("[is_state_sequence_interesting] trimmed_state_sequence[%d]: %d", i, trimmed_state_sequence[i]);
-  }
+  // for ( i=0; i<count; i++ ) {
+  //   ACTF("[is_state_sequence_interesting] trimmed_state_sequence[%d]: %d", i, trimmed_state_sequence[i]);
+  // }
 
   //Calculate the hash based on the shortened state sequence
   u32 hashKey = hash32(trimmed_state_sequence, count * sizeof(unsigned int), 0);
@@ -782,6 +782,30 @@ struct queue_entry *choose_seed(u32 target_state_id, u8 mode)
 }
 
 /* Update state-aware variables */
+int get_if_sequence_interesting()
+{
+
+  unsigned int state_count;
+  int flag = 0;
+
+  if (!response_buf_size) return 0;
+
+  unsigned int *state_sequence = (*extract_response_codes)(response_buf, response_buf_size, &state_count);
+
+  // ACTF("[get_if_sequence_interesting] size: %d", response_buf_size);
+
+  flag = is_state_sequence_interesting(state_sequence, state_count);
+  // ACTF("[get_if_sequence_interesting] is_interesting?: %d\n", flag);
+
+  //Free state sequence
+  if (state_sequence) ck_free(state_sequence);
+  return flag;
+}
+
+
+
+
+/* Update state-aware variables */
 void update_state_aware_variables(struct queue_entry *q, u8 dry_run)
 {
 
@@ -1022,6 +1046,8 @@ void update_state_aware_variables(struct queue_entry *q, u8 dry_run)
 
   /* save the seed to file for debugging purpose */
   u8 *fn = alloc_printf("%s/replayable-queue/%s", out_dir, basename(q->fname));
+  // ACTF("[update_state_aware_variables] fn: %s", fn);
+  // ACTF("[update_state_aware_variable] q->index: %d", q->index);
   save_kl_messages_to_file(kl_messages, fn, 1, messages_sent);
   ck_free(fn);
 }
@@ -1618,6 +1644,7 @@ static void add_to_queue(u8* fname, u32 len, u8 passed_det) {
   q->is_initial_seed = 0;
   q->unique_state_count = 0;
 
+  // ACTF("[add_to_queue] q->index %d", q->index);
   if (q->depth > max_depth) max_depth = q->depth;
 
   if (queue_top) {
@@ -4011,11 +4038,9 @@ static void write_crash_readme(void) {
 static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
 
   u8  *fn = "";
-  u8  hnb;
+  u8  hnb = 0;
   //s32 fd;
   u8  keeping = 0, res;
-
-  // ACTF("[save_if_interesting] fault: %d, crash_mode %d", fault, crash_mode);
 
   if (fault == crash_mode) {
 
@@ -4028,16 +4053,17 @@ static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
     //   return 0;
     // }
 
-    hnb = 0;
+    // add by setsal
+    if ( !get_if_sequence_interesting() ) {
+      return 0;
+    }
+    // ACTF("[save_if_interesting] is_interesting?: %d", get_if_sequence_interesting());
+    // hnb = 0;
 #ifndef SIMPLE_FILES
 
     fn = alloc_printf("%s/queue/id:%06u,%s", out_dir, queued_paths,
                       describe_op(hnb));
-
-    // ACTF("%s/queue/id:%06u,%s", out_dir, queued_paths,
-    //                   describe_op(hnb));
-    // ACTF("%s", fn);
-
+    // PFATAL("STOP");
 #else
 
     fn = alloc_printf("%s/queue/id_%06u", out_dir, queued_paths);
@@ -4045,17 +4071,17 @@ static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
 #endif /* ^!SIMPLE_FILES */
 
 
-    
     // // ACTF("[save_if_interesting] message_sent: %d", messages_sent);
-    u32 full_len = save_kl_messages_to_file(kl_messages, fn, 0, messages_sent);
-    // ACTF("[save_if_interesting] full_len: %d", full_len);
-    
 
+    // 這邊好像是為了拿 full_len 所以先 co 一次
+    // ACTF("[save_if_interesting] normal_len: %d", len);
+
+    u32 full_len = save_kl_messages_to_file(kl_messages, fn, 0, messages_sent);
+    
     /* We use the actual length of all messages (full_len), not the len of the mutated message subsequence (len)*/
     add_to_queue(fn, full_len, 0);
 
-    if (state_aware_mode) update_state_aware_variables(queue_top, 0);
-    
+    if (state_aware_mode) update_state_aware_variables(queue_top, 0);    
 
     /* setsal, 預計拿掉這邊 */
     // if (hnb == 2) {
@@ -4828,7 +4854,7 @@ static void check_term_size(void);
    execve() calls, plus in several other circumstances. */
 
 static void show_stats(void) {
-
+  // return;
   static u64 last_stats_ms, last_plot_ms, last_ms, last_execs;
   static double avg_exec;
   double t_byte_ratio, stab_ratio;
@@ -4954,7 +4980,7 @@ static void show_stats(void) {
 
   sprintf(tmp + banner_pad, "%s " cLCY VERSION cLGN
           " (%s)",  crash_mode ? cPIN "peruvian were-rabbit" :
-          cYEL "AFLDEV", use_banner);
+          cYEL "AFLDEV-1 ", use_banner);
 
   SAYF("\n%s\n\n", tmp);
 
@@ -5576,8 +5602,7 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
   }
 
   /* This handles FAULT_ERROR for us: */
-
-  // PFATAL("out_buf: %ld %d %s", strlen(out_buf), len, out_buf);
+  // ACTF("[common_fuzz_stuf] normal_len: %d", len);
   queued_discovered += save_if_interesting(argv, out_buf, len, fault);
 
 
@@ -8868,7 +8893,7 @@ int main(int argc, char** argv) {
   struct timeval tv;
   struct timezone tz;
 
-  SAYF(cCYA "AFLDEV " cBRI VERSION cRST " by <contact@setsal.dev>\n");
+  SAYF(cCYA "AFLDEV-1 " cBRI VERSION cRST " by <contact@setsal.dev>\n");
 
   doc_path = access(DOC_PATH, F_OK) ? "docs" : DOC_PATH;
 

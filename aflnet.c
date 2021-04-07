@@ -1170,6 +1170,7 @@ kliter_t(lms) *get_last_message(klist_t(lms) *kl_messages)
 
 u32 save_kl_messages_to_file(klist_t(lms) *kl_messages, u8 *fname, u8 replay_enabled, u32 max_count)
 {
+  // ACTF("[save_kl_messages_to_file] max_count: %d", max_count);
   u8 *mem = NULL;
   u32 len = 0, message_size = 0;
   kliter_t(lms) *it;
@@ -1202,6 +1203,7 @@ u32 save_kl_messages_to_file(klist_t(lms) *kl_messages, u8 *fname, u8 replay_ena
   }
 
   //Write everything to file & close the file
+  // ACTF("[save_kl] %s, %d", fname, len);
   ck_write(fd, mem, len, fname);
   close(fd);
 
