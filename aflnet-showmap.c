@@ -54,14 +54,21 @@
 #include <sys/types.h>
 #include <sys/resource.h>
 
+#include "aflnet.h"
+
 static s32 child_pid;                 /* PID of the tested program         */
 
 static u8* trace_bits;                /* SHM with instrumentation bitmap   */
 
 static u8 *out_file,                  /* Trace output file                 */
+          *packet_file,
+          *protocol_type,
           *doc_path,                  /* Path to docs                      */
           *target_path,               /* Path to target binary             */
           *at_file;                   /* Substitution string for @@        */
+
+
+int portno = 0;
 
 static u32 exec_tmout;                /* Exec timeout (ms)                 */
 
@@ -111,6 +118,146 @@ static const u8 count_class_binary[256] = {
 
 };
 
+#define server_wait_usecs 10000
+
+unsigned int* (*extract_response_codes)(unsigned char* buf, unsigned int buf_size, unsigned int* state_count_ref) = NULL;
+
+
+/* Send (mutated) messages in order to the server under test */
+int send_over_network()
+{
+
+  FILE *fp;
+  int n;
+  struct sockaddr_in serv_addr;
+  char* buf = NULL, *response_buf = NULL;
+  int response_buf_size = 0;
+  unsigned int size, packet_count = 0;
+  unsigned int socket_timeout = 1000;
+  unsigned int poll_timeout = 1;
+  // unsigned int *state_sequence, i, state_count;
+
+
+  fp = fopen(packet_file,"rb");
+
+  if (!strcmp(protocol_type, "RTSP")) extract_response_codes = &extract_response_codes_rtsp;
+  else if (!strcmp(protocol_type, "FTP")) extract_response_codes = &extract_response_codes_ftp;
+  else if (!strcmp(protocol_type, "DNS")) extract_response_codes = &extract_response_codes_dns;
+  else if (!strcmp(protocol_type, "DTLS12")) extract_response_codes = &extract_response_codes_dtls12;
+  else if (!strcmp(protocol_type, "DICOM")) extract_response_codes = &extract_response_codes_dicom;
+  else if (!strcmp(protocol_type, "SMTP")) extract_response_codes = &extract_response_codes_smtp;
+  else if (!strcmp(protocol_type, "SSH")) extract_response_codes = &extract_response_codes_ssh;
+  else if (!strcmp(protocol_type, "TLS")) extract_response_codes = &extract_response_codes_tls;
+  else {fprintf(stderr, "[AFLNet-replay] Protocol %s has not been supported yet!\n", protocol_type); exit(1);}
+
+
+  //Wait for the server to initialize
+  usleep(server_wait_usecs);
+
+  //Clear the response buffer and reset the response buffer size
+  if (response_buf) {
+    ck_free(response_buf);
+    response_buf = NULL;
+    response_buf_size = 0;
+  }
+
+  //Create a TCP/UDP socket
+  int sockfd;
+  if (!strcmp(protocol_type, "DTLS12")) {
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+  } else {
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  }
+
+  if (sockfd < 0) {
+    PFATAL("Cannot create a socket");
+  }
+
+  //Set timeout for socket data sending/receiving -- otherwise it causes a big delay
+  //if the server is still alive after processing all the requests
+  struct timeval timeout;
+
+  timeout.tv_sec = 0;
+  timeout.tv_usec = socket_timeout;
+
+  setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout));
+
+  memset(&serv_addr, '0', sizeof(serv_addr));
+
+  serv_addr.sin_family = AF_INET;
+  serv_addr.sin_port = htons(portno);
+  serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+  if(connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+    //If it cannot connect to the server under test
+    //try it again as the server initial startup time is varied
+    for (n=0; n < 1000; n++) {
+      if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == 0) break;
+      usleep(1000);
+    }
+    if (n== 1000) {
+      close(sockfd);
+      return 1;
+    }
+  }
+
+
+  while(!feof(fp)) {
+    if (buf) {ck_free(buf); buf = NULL;}
+    if (fread(&size, sizeof(unsigned int), 1, fp) > 0) {
+      packet_count++;
+    	// fprintf(stderr,"\nSize of the current packet %d is  %d\n", packet_count, size);
+
+      buf = (char *)ck_alloc(size);
+      fread(buf, size, 1, fp);
+
+      if (net_recv(sockfd, timeout, poll_timeout, &response_buf, &response_buf_size)) break;
+      n = net_send(sockfd, timeout, buf,size);
+      // ACTF("[DEBUG] %s", buf);
+      if (n != size) break;
+
+      if (net_recv(sockfd, timeout, poll_timeout, &response_buf, &response_buf_size)) break;
+    }
+  }
+
+  
+  fclose(fp);
+  close(sockfd);
+
+
+  //Extract response codes
+  // state_sequence = (*extract_response_codes)(response_buf, response_buf_size, &state_count);
+
+  // fprintf(stderr,"\n--------------------------------");
+  // fprintf(stderr,"\nResponses from server:");
+
+  // for (i = 0; i < state_count; i++) {
+  //   fprintf(stderr,"%d-",state_sequence[i]);
+  // }
+
+  // fprintf(stderr,"\n++++++++++++++++++++++++++++++++\nResponses in details:\n");
+  // for (i=0; i < response_buf_size; i++) {
+  //   fprintf(stderr,"%c",response_buf[i]);
+  // }
+  // fprintf(stderr,"\n--------------------------------");
+
+  //Free memory
+  // ck_free(state_sequence);
+  if (buf) ck_free(buf);
+  ck_free(response_buf);
+
+  // if (child_pid > 0) kill(child_pid, SIGTERM);
+
+  //give the server a bit more time to gracefully terminate
+  // while(1) {
+  //   int status = kill(child_pid, 0);
+  //   if ((status != 0) && (errno == ESRCH)) break;
+  // }
+  
+  return 0;
+}
+
+
 static void classify_counts(u8* mem, const u8* map) {
 
   u32 i = MAP_SIZE;
@@ -132,6 +279,8 @@ static void classify_counts(u8* mem, const u8* map) {
   }
 
 }
+
+
 
 
 /* Get rid of shared memory (atexit handler). */
@@ -310,6 +459,9 @@ static void run_target(char** argv) {
 
   }
 
+  // setsal comment
+  send_over_network();
+
   /* Configure timeout, wait for child, cancel timeout. */
 
   if (exec_tmout) {
@@ -322,6 +474,8 @@ static void run_target(char** argv) {
 
   setitimer(ITIMER_REAL, &it, NULL);
 
+  if (child_pid > 0) kill(child_pid, SIGTERM);
+
   if (waitpid(child_pid, &status, 0) <= 0) FATAL("waitpid() failed");
 
   child_pid = 0;
@@ -329,12 +483,14 @@ static void run_target(char** argv) {
   it.it_value.tv_usec = 0;
   setitimer(ITIMER_REAL, &it, NULL);
 
+
   MEM_BARRIER();
 
   /* Clean up bitmap, analyze exit condition, etc. */
 
   if (*(u32*)trace_bits == EXEC_FAIL_SIG)
     FATAL("Unable to execute '%s'", argv[0]);
+
 
   classify_counts(trace_bits, binary_mode ?
                   count_class_binary : count_class_human);
@@ -469,7 +625,7 @@ static void detect_file_args(char** argv) {
 
 static void show_banner(void) {
 
-  SAYF(cCYA "aflnet-showmap " cBRI VERSION cRST " by <contact@setsal.dev>\n");
+  SAYF(cCYA "afl-showmap " cBRI VERSION cRST " by <lcamtuf@google.com>\n");
 
 }
 
@@ -632,11 +788,31 @@ int main(int argc, char** argv) {
   u32 tcnt;
   char** use_argv;
 
+
+
   doc_path = access(DOC_PATH, F_OK) ? "docs" : DOC_PATH;
 
-  while ((opt = getopt(argc,argv,"+o:m:t:A:eqZQbc")) > 0)
+  while ((opt = getopt(argc,argv,"+o:+f:+s:+p:t:A:eqZQbc")) > 0)
 
     switch (opt) {
+
+      case 'f':
+
+      if (packet_file) FATAL("Multiple -o options not supported");
+        packet_file = optarg;
+      break;
+
+      case 's':
+
+      if (protocol_type) FATAL("Multiple -o options not supported");
+        protocol_type = optarg;
+      break;
+
+      case 'p':
+
+      if (portno) FATAL("Multiple -o options not supported");
+        portno = atoi(optarg);
+      break;            
 
       case 'o':
 
@@ -757,7 +933,7 @@ int main(int argc, char** argv) {
   setup_signal_handlers();
 
   set_up_environment();
-
+  
   find_binary(argv[optind]);
 
   if (!quiet_mode) {
@@ -773,7 +949,7 @@ int main(int argc, char** argv) {
     use_argv = argv + optind;
 
   run_target(use_argv);
-
+  
   tcnt = write_results();
 
   if (!quiet_mode) {
@@ -782,6 +958,7 @@ int main(int argc, char** argv) {
     OKF("Captured %u tuples in '%s'." cRST, tcnt, out_file);
 
   }
+  return 0;
 
   exit(child_crashed * 2 + child_timed_out);
 
