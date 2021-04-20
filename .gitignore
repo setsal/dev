@@ -9,6 +9,7 @@ afl-gcc
 afl-gotcpu
 afl-showmap
 aflnet-showmap
+aflnet-showmap-nwe
 afl-tmin
 aflnet-replay
 aflnet.o

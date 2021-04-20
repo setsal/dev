@@ -24,7 +24,7 @@ MISC_PATH   = $(PREFIX)/share/afl
 
 # PROGS intentionally omit afl-as, which gets installed elsewhere.
 
-PROGS       = afl-gcc afl-fuzz aflnet-replay afl-showmap afl-tmin afl-gotcpu afl-analyze aflnet-fuzz aflnet-showmap
+PROGS       = afl-gcc afl-fuzz aflnet-replay afl-showmap afl-tmin afl-gotcpu afl-analyze aflnet-fuzz aflnet-showmap aflnet-showmap-nwe
 SH_PROGS    = afl-plot afl-cmin afl-whatsup
 
 CFLAGS     ?= -O3 -funroll-loops
@@ -91,6 +91,9 @@ afl-showmap: afl-showmap.c $(COMM_HDR) | test_x86
 
 aflnet-showmap: aflnet-showmap.c $(COMM_HDR) aflnet.o aflnet.h | test_x86
 	$(CC) $(CFLAGS) $@.c aflnet.o -o $@ $(LDFLAGS)
+
+aflnet-showmap-nwe: aflnet-showmap-nwe.c $(COMM_HDR) aflnet.o aflnet.h | test_x86
+	$(CC) $(CFLAGS) $@.c aflnet.o -o $@ $(LDFLAGS)	
 
 afl-tmin: afl-tmin.c $(COMM_HDR) | test_x86
 	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
