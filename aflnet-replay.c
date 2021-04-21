@@ -128,6 +128,8 @@ int main(int argc, char* argv[])
   //Extract response codes
   state_sequence = (*extract_response_codes)(response_buf, response_buf_size, &state_count);
 
+  fprintf(stderr,"state count %d\n",state_count);
+
   fprintf(stderr,"\n--------------------------------");
   fprintf(stderr,"\nResponses from server:");
 

@@ -391,6 +391,13 @@ u8 region_level_mutation = 0;
 u8 state_selection_algo = ROUND_ROBIN, seed_selection_algo = RANDOM_SELECTION;
 u8 false_negative_reduction = 0;
 
+
+// state level
+u8 state_coverage_define = 0;
+u8 state_coverage_level = 1;
+
+
+
 /* Implemented state machine */
 Agraph_t  *ipsm;
 static FILE* ipsm_dot_file;
@@ -494,7 +501,10 @@ u32 get_unique_state_count(unsigned int *state_sequence, unsigned int state_coun
 }
 
 /* Check if a state sequence is interesting (e.g., new state is dicovered). Loop is taken into account */
-u8 is_state_sequence_interesting(unsigned int *state_sequence, unsigned int state_count) {
+u8 is_state_sequence_interesting(unsigned int *state_sequence, unsigned int state_count, int flag) {
+  if ( flag == 1 ) {
+    return 1;
+  }
   //limit the loop count to only 1
   
   u32 *trimmed_state_sequence = NULL;
@@ -782,25 +792,55 @@ struct queue_entry *choose_seed(u32 target_state_id, u8 mode)
 }
 
 /* Update state-aware variables */
-int get_if_sequence_interesting()
+int get_if_sequence_interesting(struct queue_entry *q)
 {
 
   unsigned int state_count;
+  unsigned int unique_state_count;
   int flag = 0;
 
   if (!response_buf_size) return 0;
 
   unsigned int *state_sequence = (*extract_response_codes)(response_buf, response_buf_size, &state_count);
+  
+  unique_state_count = get_unique_state_count(state_sequence, state_count);
+  // u8 *temp_str = state_sequence_to_string(state_sequence, state_count);
+  // ACTF("[update_state_aware_variables] temp_str: %s", temp_str);
 
-  // ACTF("[get_if_sequence_interesting] size: %d", response_buf_size);
 
-  flag = is_state_sequence_interesting(state_sequence, state_count);
+
+  // ACTF("[get_if_sequence_interesting] size: %d", state_count);
+  // ACTF("[get_if_sequence_interesting] region %d, state: %d", q->region_count, state_count);
+  // PFATAL("STOP");
+
+
+  if ( state_coverage_level == 1 ) {
+    if ( q->region_count > state_count-1 ) {
+        return 0;
+    }    
+  }
+  else if ( state_coverage_level == 2 ) {
+    if ( q->region_count > state_count-1 ) {
+      return 0;
+    }
+
+    // level 2 state loop 只允許 2 次 -> 相似度
+    flag = is_state_sequence_interesting(state_sequence, state_count, 0);    
+  }
+
+  
+  // Level 3 prime path
+  // if ( unique_state_count != state_count ) {
+  //   return 0;
+  // }
+
   // ACTF("[get_if_sequence_interesting] is_interesting?: %d\n", flag);
 
   //Free state sequence
   if (state_sequence) ck_free(state_sequence);
   return flag;
 }
+
 
 
 
@@ -818,13 +858,12 @@ void update_state_aware_variables(struct queue_entry *q, u8 dry_run)
 
   unsigned int *state_sequence = (*extract_response_codes)(response_buf, response_buf_size, &state_count);
 
-  q->unique_state_count = get_unique_state_count(state_sequence, state_count);
-
+  // q->unique_state_count = get_unique_state_count(state_sequence, state_count);
+  // PFATAL("STOP");
   // ACTF("[update_state_aware_variables]");
 
-  if (is_state_sequence_interesting(state_sequence, state_count)) {
+  if (is_state_sequence_interesting(state_sequence, state_count, 1)) {
 
-    // ACTF("[update_state_aware_variables] is_interesting");
     //Save the current kl_messages to a file which can be used to replay the newly discovered paths on the ipsm
     u8 *temp_str = state_sequence_to_string(state_sequence, state_count);
     // ACTF("[update_state_aware_variables] temp_str: %s", temp_str);
@@ -4052,11 +4091,21 @@ static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
     //   if (crash_mode) total_crashes++;
     //   return 0;
     // }
+    // ACTF("[interesting] region_count: %d", queue_top->region_count );
+    
+    // for(int i = 0; i < queue_top->region_count ; i++) {
+    //   ACTF("[interesting] s: %d, e: %d\n", queue_top->regions[i].start_byte,  queue_top->regions[i].end_byte);
+    // }
 
+
+    // PFATAL("STOP");
     // add by setsal
-    if ( !get_if_sequence_interesting() ) {
+    if ( !get_if_sequence_interesting(queue_top) ) {
+      // ACTF("not store");
       return 0;
     }
+
+    // ACTF("store!!");
     // ACTF("[save_if_interesting] is_interesting?: %d", get_if_sequence_interesting());
     // hnb = 0;
 #ifndef SIMPLE_FILES
@@ -5991,6 +6040,7 @@ AFLNET_REGIONS_SELECTION:;
   and M2_region_count which is the total number of regions in M2. How the information is identified is
   state aware dependent. However, once the information is clear, the code for fuzzing preparation is the same */
 
+
   if (state_aware_mode) {
     /* In state aware mode, select M2 based on the targeted state ID */
     u32 total_region = queue_cur->region_count;
@@ -6000,6 +6050,7 @@ AFLNET_REGIONS_SELECTION:;
     // ACTF("target_state_id: %d",  target_state_id );
     // ACTF("total_region: %d",  total_region);
 
+
     if (target_state_id == 0) {
       //No prefix subsequence (M1 is empty)
       M2_start_region_ID = 0;
@@ -6008,12 +6059,10 @@ AFLNET_REGIONS_SELECTION:;
       //To compute M2_region_count, we identify the first region which has a different annotation
       //Now we quickly compare the state count, we could make it more fine grained by comparing the exact response codes
       for(i = 0; i < queue_cur->region_count ; i++) {
-        // ACTF("queue_cur->regions[%d].state_count: %d, start_byte: %d, end_byte: %d",  i, queue_cur->regions[i].state_count, queue_cur->regions[i].start_byte, queue_cur->regions[i].end_byte);
         if (queue_cur->regions[i].state_count != queue_cur->regions[0].state_count) break;
         M2_region_count++;
       }
-
-      // ACTF("M2_region_count: %d",  M2_region_count);
+  
       //  ACTF("M2_start_region_ID: %d",  M2_start_region_ID);
     } else {
       //M1 is unlikely to be empty
@@ -8900,7 +8949,7 @@ int main(int argc, char** argv) {
   gettimeofday(&tv, &tz);
   srandom(tv.tv_sec ^ tv.tv_usec ^ getpid());
 
-  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:QN:D:W:w:P:KEq:s:RFc:z")) > 0)
+  while ((opt = getopt(argc, argv, "+i:o:f:m:l:t:T:dnCB:S:M:x:QN:D:W:w:P:KEq:s:RFc:z")) > 0)
 
     switch (opt) {
 
@@ -9020,6 +9069,14 @@ int main(int argc, char** argv) {
         skip_deterministic = 1;
         use_splicing = 1;
         break;
+
+      case 'l':
+        if (state_coverage_define) FATAL("Multiple -l options not supported");
+
+        if (sscanf(optarg, "%hhu", &state_coverage_level) < 1 || optarg[0] == '-') FATAL("Bad syntax used for -l");
+        state_coverage_define = 1;
+        break;
+
 
       case 'B': /* load bitmap */
 
