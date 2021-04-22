@@ -807,34 +807,38 @@ int get_if_sequence_interesting(struct queue_entry *q)
   // u8 *temp_str = state_sequence_to_string(state_sequence, state_count);
   // ACTF("[update_state_aware_variables] temp_str: %s", temp_str);
 
-
-
-  // ACTF("[get_if_sequence_interesting] size: %d", state_count);
+  // ACTF("[get_if_sequence_interesting] state_coverage_level: %d", state_coverage_level);
   // ACTF("[get_if_sequence_interesting] region %d, state: %d", q->region_count, state_count);
-  // PFATAL("STOP");
+
+  // level 2 state loop 只允許 2 次 -> 相似度
+  flag = is_state_sequence_interesting(state_sequence, state_count, 0);        
 
 
   if ( state_coverage_level == 1 ) {
     if ( q->region_count > state_count-1 ) {
-        return 0;
-    }    
+      flag = 0;
+    }
+    else {
+      flag = 1;
+    }
   }
   else if ( state_coverage_level == 2 ) {
-    if ( q->region_count > state_count-1 ) {
-      return 0;
+    if ( q->region_count > state_count-1 || flag == 0 ) {
+      flag = 0;
     }
-
-    // level 2 state loop 只允許 2 次 -> 相似度
-    flag = is_state_sequence_interesting(state_sequence, state_count, 0);    
+    else {
+      flag = 1;
+    }
+  }
+  else if ( state_coverage_level == 3 ) {
+    if ( q->region_count > state_count-1 || flag == 0 || unique_state_count != state_count ) {
+      flag = 0;
+    }
+    else {
+      flag = 1;
+    }
   }
 
-  
-  // Level 3 prime path
-  // if ( unique_state_count != state_count ) {
-  //   return 0;
-  // }
-
-  // ACTF("[get_if_sequence_interesting] is_interesting?: %d\n", flag);
 
   //Free state sequence
   if (state_sequence) ck_free(state_sequence);
