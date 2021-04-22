@@ -797,6 +797,7 @@ int get_if_sequence_interesting(struct queue_entry *q)
 
   unsigned int state_count;
   unsigned int unique_state_count;
+  unsigned int current_region_counts;
   int flag = 0;
 
   if (!response_buf_size) return 0;
@@ -804,6 +805,7 @@ int get_if_sequence_interesting(struct queue_entry *q)
   unsigned int *state_sequence = (*extract_response_codes)(response_buf, response_buf_size, &state_count);
   
   unique_state_count = get_unique_state_count(state_sequence, state_count);
+  current_region_counts = q->region_count;
   // u8 *temp_str = state_sequence_to_string(state_sequence, state_count);
   // ACTF("[update_state_aware_variables] temp_str: %s", temp_str);
 
@@ -813,25 +815,46 @@ int get_if_sequence_interesting(struct queue_entry *q)
   // level 2 state loop 只允許 2 次 -> 相似度
   flag = is_state_sequence_interesting(state_sequence, state_count, 0);        
 
-
+  
+  // 數量增加
   if ( state_coverage_level == 1 ) {
-    if ( q->region_count > state_count-1 ) {
+    if ( current_region_counts > state_count-1 ) {
       flag = 0;
     }
     else {
       flag = 1;
     }
   }
-  else if ( state_coverage_level == 2 ) {
-    if ( q->region_count > state_count-1 || flag == 0 ) {
+  else if ( state_coverage_level == 2 ) {  // 數量增加不過多
+    // 避免過多 mutate 變化狀態過多而無用
+    if ( current_region_counts > state_count-1 || state_count-1-current_region_counts > 3 ) {
       flag = 0;
     }
     else {
       flag = 1;
-    }
+    }    
   }
   else if ( state_coverage_level == 3 ) {
-    if ( q->region_count > state_count-1 || flag == 0 || unique_state_count != state_count ) {
+    // 數量增加不重複
+    if ( current_region_counts > state_count-1 || flag == 0 ) {
+      flag = 0;
+    }
+    else {
+      flag = 1;
+    }
+  }
+  else if ( state_coverage_level == 4 ) {
+    // 數量增加不多過且不重複
+    if ( current_region_counts > state_count-1 || state_count-1-current_region_counts > 3 || flag == 0 ) {
+      flag = 0;
+    }
+    else {
+      flag = 1;
+    }
+  }  
+  else if ( state_coverage_level == 5 ) {
+    // 數量增加且狀態唯一
+    if ( current_region_counts > state_count-1 || unique_state_count != state_count ) {
       flag = 0;
     }
     else {
