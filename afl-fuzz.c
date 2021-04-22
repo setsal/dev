@@ -861,6 +861,33 @@ int get_if_sequence_interesting(struct queue_entry *q)
       flag = 1;
     }
   }
+  else if ( state_coverage_level == 6 ) {
+    // 最原始
+    if ( flag == 0 ) {
+      flag = 0;
+    }
+    else {
+      flag = 1;
+    }
+  }  
+  else if ( state_coverage_level == 7 ) {
+    // 最原始多一點
+    if ( current_region_counts != state_count-1 || flag == 0 ) {
+      flag = 0;
+    }
+    else {
+      flag = 1;
+    }
+  } 
+  else if ( state_coverage_level == 8 ) {
+    // ??? 情況
+    if ( current_region_counts < state_count-1 || flag == 0 ) {
+      flag = 0;
+    }
+    else {
+      flag = 1;
+    }
+  }     
 
 
   //Free state sequence
