@@ -394,7 +394,20 @@ u8 false_negative_reduction = 0;
 
 // state level
 u8 state_coverage_define = 0;
-u8 state_coverage_level = 1;
+u8 state_coverage_level = 6;
+
+// max queued
+u32 max_queues = 3000;
+u32 max_queues_default = 5000;
+u8 max_queued_discovered_alpha_define = 0;
+u32 max_queued_discovered_alpha = 5000;
+u8 max_queued_discovered_beta_define = 0;
+u8 max_queued_discovered_beta = 5;
+
+// log_base(5, 10) => log5^10
+int log_base(int x, int y) {
+  return (int) (log(y)/log(x));
+}
 
 
 
@@ -796,98 +809,56 @@ int get_if_sequence_interesting(struct queue_entry *q)
 {
 
   unsigned int state_count;
-  unsigned int unique_state_count;
-  unsigned int current_region_counts;
+  // unsigned int unique_state_count;
+  // unsigned int current_region_counts;
   int flag = 0;
+  int i;
+  khint_t k;
+
 
   if (!response_buf_size) return 0;
 
   unsigned int *state_sequence = (*extract_response_codes)(response_buf, response_buf_size, &state_count);
   
-  unique_state_count = get_unique_state_count(state_sequence, state_count);
-  current_region_counts = q->region_count;
+  for ( i=0; i<state_count; i++) {
+    k = kh_get(hms, khms_states, state_sequence[i]);
+    if (k == kh_end(khms_states)) {
+      // ACTF("single new state discovered %d !!", state_sequence[i]);
+      if (state_sequence) ck_free(state_sequence);
+      return 1;
+    }    
+  }
+
+  // unique_state_count = get_unique_state_count(state_sequence, state_count);
+  // current_region_counts = q->region_count;
+  
   // u8 *temp_str = state_sequence_to_string(state_sequence, state_count);
-  // ACTF("[update_state_aware_variables] temp_str: %s", temp_str);
+  // ACTF("[update_state_aware_variables] return temp_str: %s", temp_str);
+  // ACTF("[update_state_aware_variables] region_count: %d\n", q->region_count);
 
   // ACTF("[get_if_sequence_interesting] state_coverage_level: %d", state_coverage_level);
   // ACTF("[get_if_sequence_interesting] region %d, state: %d", q->region_count, state_count);
 
   // level 2 state loop 只允許 2 次 -> 相似度
-  flag = is_state_sequence_interesting(state_sequence, state_count, 0);        
+  flag = is_state_sequence_interesting(state_sequence, state_count, 0);
 
+  max_queues = max_queued_discovered_alpha * log_base(max_queued_discovered_beta, state_ids_count);
+  max_queues = max_queues + (queue_cycle + 1) * 100;
+
+  if ( queued_discovered == max_queues ) {
+    flag = 0;
+  }
   
-  // 數量增加
-  if ( state_coverage_level == 1 ) {
-    if ( current_region_counts > state_count-1 ) {
-      flag = 0;
-    }
-    else {
-      flag = 1;
-    }
-  }
-  else if ( state_coverage_level == 2 ) {  // 數量增加不過多
-    // 避免過多 mutate 變化狀態過多而無用
-    if ( current_region_counts > state_count-1 || state_count-1-current_region_counts > 3 ) {
-      flag = 0;
-    }
-    else {
-      flag = 1;
-    }    
-  }
-  else if ( state_coverage_level == 3 ) {
-    // 數量增加不重複
-    if ( current_region_counts > state_count-1 || flag == 0 ) {
-      flag = 0;
-    }
-    else {
-      flag = 1;
-    }
-  }
-  else if ( state_coverage_level == 4 ) {
-    // 數量增加不多過且不重複
-    if ( current_region_counts > state_count-1 || state_count-1-current_region_counts > 3 || flag == 0 ) {
-      flag = 0;
-    }
-    else {
-      flag = 1;
-    }
-  }  
-  else if ( state_coverage_level == 5 ) {
-    // 數量增加且狀態唯一
-    if ( current_region_counts > state_count-1 || unique_state_count != state_count ) {
-      flag = 0;
-    }
-    else {
-      flag = 1;
-    }
-  }
-  else if ( state_coverage_level == 6 ) {
-    // 最原始
-    if ( flag == 0 ) {
-      flag = 0;
-    }
-    else {
-      flag = 1;
-    }
-  }  
-  else if ( state_coverage_level == 7 ) {
-    // 最原始多一點
-    if ( current_region_counts != state_count-1 || flag == 0 ) {
-      flag = 0;
-    }
-    else {
-      flag = 1;
-    }
-  } 
-  else if ( state_coverage_level == 8 ) {
-    // ??? 情況
-    if ( current_region_counts < state_count-1 || flag == 0 ) {
-      flag = 0;
-    }
-    else {
-      flag = 1;
-    }
-  }     
+
+  // if ( state_coverage_level == 6 ) {
+  //   // 最原始
+  //   if ( flag == 0 ) {
+  //     flag = 0;
+  //   }
+  //   else {
+  //     flag = 1;
+  //   }
+  // }
 
 
   //Free state sequence
@@ -4482,6 +4453,8 @@ static void write_stats_file(double bitmap_cvg, double stability, double eps) {
              "afl_version       : " VERSION "\n"
              "target_mode       : %s%s%s%s%s%s%s\n"
              "command_line      : %s\n"
+             "unique_state_cnt  : %u\n"
+             "max_queues        : %d\n"
              "slowest_exec_ms   : %llu\n",
              start_time / 1000, get_cur_time() / 1000, getpid(),
              queue_cycle ? (queue_cycle - 1) : 0, total_execs, eps,
@@ -4496,7 +4469,7 @@ static void write_stats_file(double bitmap_cvg, double stability, double eps) {
              persistent_mode ? "persistent " : "", deferred_mode ? "deferred " : "",
              (qemu_mode || dumb_mode || no_forkserver || crash_mode ||
               persistent_mode || deferred_mode) ? "" : "default",
-             orig_cmdline, slowest_exec_ms);
+             orig_cmdline, state_ids_count, max_queues, slowest_exec_ms);
              /* ignore errors */
 
   /* Get rss value from the children
@@ -5373,8 +5346,9 @@ static void show_stats(void) {
 
   }
 
-  SAYF(bV bSTOP "        trim : " cRST "%-37s " bSTG bVR bH20 bH2 bH2 bRB "\n"
-       bLB bH30 bH20 bH2 bH bRB bSTOP cRST RESET_G1, tmp);
+  SAYF(bV bSTOP "        trim : " cRST "%-5s%-32s " bSTG bVR bH20 bH2 bH2 bRB "\n"
+       bLB bH30 bH20 bH2 bH bRB bSTOP cRST RESET_G1, DI(max_queues), tmp);
+       
 
   /* Provide some CPU utilization stats. */
 
@@ -5570,8 +5544,9 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
   }
 
   write_to_testcase(out_buf, len);
-  // ACTF("[common_fuzz_stuff]: %d %s", len, out_buf);
   // PFATAL("STOP");
+
+  // ACTF("[comman_fuzz_stuff] After mutate out_buf:\n%s", out_buf);
 
   /* AFLNet update kl_messages linked list */
 
@@ -5596,14 +5571,17 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
   kliter_t(lms) *prev_last_message, *cur_last_message;
   prev_last_message = get_last_message(kl_messages);
 
-  // ACTF("[Before extract] new region_count: %d", region_count);
+  // ACTF("[comman_fuzz_stuff] After mutate node region_count: %d", region_count);
 
   // limit the #messages based on max_seed_region_count to reduce overhead
   for (i = 0; i < region_count; i++) {
     u32 len;
     //Identify region size
     if (i == max_seed_region_count) {
-      len = regions[region_count - 1].end_byte - regions[i].start_byte + 1;
+      // len = regions[region_count - 1].end_byte - regions[i].start_byte + 1;
+      len = regions[i].end_byte - regions[i].start_byte + 1;
+      // ACTF("[common] %d", regions[region_count-1].end_byte);
+      // ACTF("[common] %d", regions[i].start_byte);
     } else {
       len = regions[i].end_byte - regions[i].start_byte + 1;
     }
@@ -5637,20 +5615,10 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
   //detach the head of previous M2 from the list
   kliter_t(lms) *old_M2_start;
   if (M2_prev == NULL) {
-    
     old_M2_start = kl_begin(kl_messages);
     kl_begin(kl_messages) = kl_next(prev_last_message);
     kl_next(cur_last_message) = M2_next;
-    kl_next(prev_last_message) = kl_end(kl_messages);
-
-    /* setsal test */
-    // kliter_t(lms) *it;
-    // int myCnt2 = 0;
-    // for (it = kl_begin(kl_messages); it != kl_end(kl_messages); it = kl_next(it)) {    
-    //   myCnt2++;
-    // }
-    // ACTF("[After extract] In link list: %ld", kl_messages->size);
-  
+    kl_next(prev_last_message) = kl_end(kl_messages);  
 
   } else {
     old_M2_start = kl_next(M2_prev);
@@ -5658,6 +5626,16 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
     kl_next(cur_last_message) = M2_next;
     kl_next(prev_last_message) = kl_end(kl_messages);
   }
+
+
+  /* setsal test */
+  // ACTF("[common] After detach");
+  // kliter_t(lms) *it;
+  // for (it = kl_begin(kl_messages); it != kl_end(kl_messages); it = kl_next(it)) {    
+  //   ACTF("%s", kl_val(it)->mdata);
+  // }
+  // ACTF("[common] done");
+
 
   // free the previous M2
   kliter_t(lms) *cur_it, *next_it;
@@ -5707,7 +5685,7 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
   /* This handles FAULT_ERROR for us: */
   // ACTF("[common_fuzz_stuf] normal_len: %d", len);
   queued_discovered += save_if_interesting(argv, out_buf, len, fault);
-
+  // ACTF("[common] queue: %d", queued_discovered);
 
   // setsal tmp
   if (!(stage_cur % stats_update_freq) || stage_cur + 1 == stage_max)
@@ -6101,8 +6079,8 @@ AFLNET_REGIONS_SELECTION:;
     if (total_region == 0) PFATAL("0 region found for %s", queue_cur->fname);
     
     
-    // ACTF("target_state_id: %d",  target_state_id );
-    // ACTF("total_region: %d",  total_region);
+    // ACTF("[fuzz_one] target_state_id: %d",  target_state_id );
+    // ACTF("[fuzz_one] queue_cur->region_count: %d",  queue_cur->region_count);
 
 
     if (target_state_id == 0) {
@@ -6160,6 +6138,8 @@ AFLNET_REGIONS_SELECTION:;
 
   // ACTF("fname: %s", queue_cur->fname);
   
+  // u8 *temp_str = state_sequence_to_string(queue_cur->regions[queue_cur->region_count-1].state_sequence, queue_cur->regions[queue_cur->region_count-1].state_count);
+  // ACTF("[fuzz_one] state_count: %d, temp_str: %s", queue_cur->regions[queue_cur->region_count-1].state_count, temp_str);  
 
   kliter_t(lms) *it;
 
@@ -6178,8 +6158,7 @@ AFLNET_REGIONS_SELECTION:;
     count++;
   }
 
-  // ACTF("count: %d", count);
-  
+
 
 
   /* Construct the buffer to be mutated and update out_buf */
@@ -6204,6 +6183,8 @@ AFLNET_REGIONS_SELECTION:;
 
   out_buf = ck_alloc_nozero(in_buf_size);
   memcpy(out_buf, in_buf, in_buf_size);
+
+  // ACTF("[fuzz_one] origin mutate out_buf: %s", out_buf);
 
   //Update len to keep the correct size of the buffer being mutated
   len = in_buf_size;
@@ -9003,7 +8984,7 @@ int main(int argc, char** argv) {
   gettimeofday(&tv, &tz);
   srandom(tv.tv_sec ^ tv.tv_usec ^ getpid());
 
-  while ((opt = getopt(argc, argv, "+i:o:f:m:l:t:T:dnCB:S:M:x:QN:D:W:w:P:KEq:s:RFc:z")) > 0)
+  while ((opt = getopt(argc, argv, "+i:o:f:m:l:u:b:t:T:dnCB:S:M:x:QN:D:W:w:P:KEq:s:RFc:z")) > 0)
 
     switch (opt) {
 
@@ -9130,6 +9111,20 @@ int main(int argc, char** argv) {
         if (sscanf(optarg, "%hhu", &state_coverage_level) < 1 || optarg[0] == '-') FATAL("Bad syntax used for -l");
         state_coverage_define = 1;
         break;
+
+      case 'u':
+        if (max_queued_discovered_alpha_define) FATAL("Multiple -u options not supported");
+
+        if (sscanf(optarg, "%u", &max_queued_discovered_alpha) < 1 || optarg[0] == '-') FATAL("Bad syntax used for -u");
+        max_queued_discovered_alpha_define = 1;
+        break;        
+
+      case 'b':
+        if (max_queued_discovered_beta_define) FATAL("Multiple -b options not supported");
+
+        if (sscanf(optarg, "%hhu", &max_queued_discovered_beta) < 1 || optarg[0] == '-') FATAL("Bad syntax used for -b");
+        max_queued_discovered_beta_define = 1;
+        break;    
 
 
       case 'B': /* load bitmap */
