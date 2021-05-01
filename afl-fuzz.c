@@ -402,7 +402,7 @@ u32 max_queues_default = 5000;
 u8 max_queued_discovered_alpha_define = 0;
 u32 max_queued_discovered_alpha = 5000;
 u8 max_queued_discovered_beta_define = 0;
-u8 max_queued_discovered_beta = 5;
+u8 max_queued_discovered_beta = 8;
 
 // log_base(5, 10) => log5^10
 int log_base(int x, int y) {
@@ -843,9 +843,9 @@ int get_if_sequence_interesting(struct queue_entry *q)
   flag = is_state_sequence_interesting(state_sequence, state_count, 0);
 
   max_queues = max_queued_discovered_alpha * log_base(max_queued_discovered_beta, state_ids_count);
-  max_queues = max_queues + (queue_cycle + 1) * 100;
+  max_queues = max_queues + (queue_cycle + 1) * 20;
 
-  if ( queued_discovered == max_queues ) {
+  if ( queued_discovered > max_queues ) {
     flag = 0;
   }
   
