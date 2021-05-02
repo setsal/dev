@@ -398,11 +398,10 @@ u8 state_coverage_level = 6;
 
 // max queued
 u32 max_queues = 3000;
-u32 max_queues_default = 5000;
 u8 max_queued_discovered_alpha_define = 0;
-u32 max_queued_discovered_alpha = 5000;
+u32 max_queued_discovered_alpha = 4000;
 u8 max_queued_discovered_beta_define = 0;
-u8 max_queued_discovered_beta = 5;
+u8 max_queued_discovered_beta = 10;
 
 // log_base(5, 10) => log5^10
 int log_base(int x, int y) {
@@ -563,9 +562,9 @@ void update_region_annotations(struct queue_entry* q)
       unsigned int state_count;
       q->regions[i].state_sequence = (*extract_response_codes)(response_buf, response_bytes[i], &state_count);
 
-      for (j=0; j<state_count; j++) {
+      // for (j=0; j<state_count; j++) {
         // ACTF("[update_region_annotattions] region.state_sequence: %d", q->regions[i].state_sequence[j]);
-      }
+      // }
 
       q->regions[i].state_count = state_count;
     }
