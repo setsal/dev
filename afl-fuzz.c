@@ -403,6 +403,13 @@ u32 max_queued_discovered_alpha = 4000;
 u8 max_queued_discovered_beta_define = 0;
 u8 max_queued_discovered_beta = 10;
 
+
+// interesting
+u32 cur_queue_first_id = 0;
+u32 cur_queue_last_id = 0;
+
+
+
 // log_base(5, 10) => log5^10
 int log_base(int x, int y) {
   return (int) (log(y)/log(x));
@@ -552,6 +559,10 @@ void update_region_annotations(struct queue_entry* q)
 { 
   u32 i = 0;
   u32 j = 0;
+  u32 first_id = 0;
+  u32 last_id = 0;
+
+
   // ACTF("[update_region_annotations] message_sent: %d", messages_sent);
   for (i = 0; i < messages_sent; i++) {
     // ACTF("[update_region_annotations]: response_bytes[%d]: %d", i, response_bytes[i]);
@@ -562,6 +573,7 @@ void update_region_annotations(struct queue_entry* q)
       unsigned int state_count;
       q->regions[i].state_sequence = (*extract_response_codes)(response_buf, response_bytes[i], &state_count);
 
+
       // for (j=0; j<state_count; j++) {
         // ACTF("[update_region_annotattions] region.state_sequence: %d", q->regions[i].state_sequence[j]);
       // }
@@ -569,6 +581,20 @@ void update_region_annotations(struct queue_entry* q)
       q->regions[i].state_count = state_count;
     }
   }
+  
+
+  // Favored 
+  if (target_state_id != 0 && cur_queue_first_id != 0 && cur_queue_last_id != 0 && messages_sent > 2) {    
+    first_id = q->regions[0].state_sequence[q->regions[0].state_count];
+    last_id = q->regions[messages_sent-1].state_sequence[q->regions[messages_sent-1].state_count];
+
+    if ( first_id == cur_queue_first_id && last_id == cur_queue_last_id ) {
+      q->favored = 1;
+      ACTF("[update region] Mark queue id %d as favored", q->index);
+      ACTF("[update region] cur queue first id %d, last id %d", cur_queue_first_id, cur_queue_last_id);
+    }
+  }
+
 }
 
 /* Choose a region data for region-level mutations */
@@ -828,6 +854,8 @@ int get_if_sequence_interesting(struct queue_entry *q)
     }    
   }
 
+  
+
   // unique_state_count = get_unique_state_count(state_sequence, state_count);
   // current_region_counts = q->region_count;
   
@@ -842,7 +870,7 @@ int get_if_sequence_interesting(struct queue_entry *q)
   flag = is_state_sequence_interesting(state_sequence, state_count, 0);
 
   max_queues = max_queued_discovered_alpha * log_base(max_queued_discovered_beta, state_ids_count);
-  max_queues = max_queues + (queue_cycle + 1) * 20;
+  max_queues = max_queues + (queue_cycle + 1) * 10;
 
   if ( queued_discovered > max_queues ) {
     flag = 0;
@@ -1097,13 +1125,25 @@ void update_state_aware_variables(struct queue_entry *q, u8 dry_run)
   kh_destroy(hs32, khs_state_ids);
 
   //Update paths_discovered
+
+  
   if (!dry_run) {
-    k = kh_get(hms, khms_states, target_state_id);
-    if (k != kh_end(khms_states)) {
-      kh_val(khms_states, k)->paths_discovered++;
+    if ( target_state_id == 0 ) {
+      k = kh_get(hms, khms_states, target_state_id);
+      if (k != kh_end(khms_states)) {
+        kh_val(khms_states, k)->paths_discovered++;
+      }        
+    }
+    else if (cur_queue_first_id == state_sequence[0] && cur_queue_last_id == state_sequence[state_count-1] ) {
+      k = kh_get(hms, khms_states, target_state_id);
+      if (k != kh_end(khms_states)) {
+        kh_val(khms_states, k)->paths_discovered++;
+      }
     }
   }
 
+
+  
   //Free state sequence
   if (state_sequence) ck_free(state_sequence);
 
@@ -5394,6 +5434,7 @@ static void show_stats(void) {
   /* Show debugging stats for AFLNet only when AFLNET_DEBUG environment variable is set */
   if (getenv("AFLNET_DEBUG") && (atoi(getenv("AFLNET_DEBUG")) == 1) && state_aware_mode) {
     SAYF(cRST "\n\nMax_seed_region_count: %-4s, current_kl_messages_size: %-4s\n\n", DI(max_seed_region_count), DI(kl_messages->size));
+    SAYF(cRST "\n\nCur_queue_first_id: %-4s, Cur_queue_last_id: %-4s\n\n", DI(cur_queue_first_id), DI(cur_queue_last_id));
     SAYF(cRST "State IDs and its #selected_times,"cCYA  "#fuzzs,"cLRD "#discovered_paths,"cGRA "#excersing_paths:\n");
 
     khint_t k;
@@ -6071,12 +6112,11 @@ AFLNET_REGIONS_SELECTION:;
   and M2_region_count which is the total number of regions in M2. How the information is identified is
   state aware dependent. However, once the information is clear, the code for fuzzing preparation is the same */
 
-
+  // PFATAL("STOP");
   if (state_aware_mode) {
     /* In state aware mode, select M2 based on the targeted state ID */
     u32 total_region = queue_cur->region_count;
     if (total_region == 0) PFATAL("0 region found for %s", queue_cur->fname);
-    
     
     // ACTF("[fuzz_one] target_state_id: %d",  target_state_id );
     // ACTF("[fuzz_one] queue_cur->region_count: %d",  queue_cur->region_count);
@@ -6093,8 +6133,14 @@ AFLNET_REGIONS_SELECTION:;
         if (queue_cur->regions[i].state_count != queue_cur->regions[0].state_count) break;
         M2_region_count++;
       }
-  
-      //  ACTF("M2_start_region_ID: %d",  M2_start_region_ID);
+
+      
+      // u32 first_id_count = queue_cur->regions[queue_cur->region_count-1].state_count;
+      // cur_queue_last_id = queue_cur->regions[queue_cur->region_count-1].state_sequence[first_id_count - 1];
+
+      // ACTF("[fuzz_one] not first, last:%d", cur_queue_last_id);
+
+
     } else {
       //M1 is unlikely to be empty
       M2_start_region_ID = 0;
@@ -6105,6 +6151,9 @@ AFLNET_REGIONS_SELECTION:;
         if (regionalStateCount > 0) {
           //reachableStateID is the last ID in the state_sequence
           u32 reachableStateID = queue_cur->regions[i].state_sequence[regionalStateCount - 1];
+
+          // ACTF("[fuzz_one] %d: %d", i, reachableStateID);
+
           M2_start_region_ID++;
           if (reachableStateID == target_state_id) break;
         } else {
@@ -6112,6 +6161,34 @@ AFLNET_REGIONS_SELECTION:;
           return 1;
         }
       }
+
+      u32 first_id_count = 0;
+      u32 last_id_count = 0;
+
+      if ( queue_cur->region_count > 2 ) {
+
+        first_id_count = queue_cur->regions[0].state_count;
+        last_id_count = queue_cur->regions[queue_cur->region_count-1].state_count;
+
+        if ( first_id_count != 0) {
+          cur_queue_first_id = queue_cur->regions[0].state_sequence[first_id_count - 1];
+        }
+        
+        if (last_id_count != 0) {
+          cur_queue_last_id = queue_cur->regions[queue_cur->region_count-1].state_sequence[last_id_count - 1];              
+        }
+      }
+
+      // u32 first_id_count = queue_cur->regions[0].state_count;
+      // cur_queue_first_id = queue_cur->regions[0].state_sequence[first_id_count - 1];
+
+
+      // u32 last_id_count = queue_cur->regions[queue_cur->region_count-1].state_count;
+      // cur_queue_last_id = queue_cur->regions[queue_cur->region_count-1].state_sequence[last_id_count - 1];      
+
+      // ACTF("[fuzz_one] first:%d, last:%d", cur_queue_first_id, cur_queue_last_id);
+
+      // PFATAL("STOP");
 
       //Then identify M2_region_count
       for(i = M2_start_region_ID; i < queue_cur->region_count ; i++) {
@@ -9423,6 +9500,10 @@ int main(int argc, char** argv) {
           }
         }
       }
+
+      // reset
+      cur_queue_last_id = 0;
+      cur_queue_first_id = 0;
 
       skipped_fuzz = fuzz_one(use_argv);
 
