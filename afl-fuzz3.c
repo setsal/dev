@@ -557,7 +557,7 @@ u8 is_state_sequence_interesting(unsigned int *state_sequence, unsigned int stat
 /* Update the annotations of regions (i.e., state sequence received from the server) */
 void update_region_annotations(struct queue_entry* q)
 { 
-  u32 i = 0, j = 0;
+  u32 i = 0;
   u32 first_id = 0;
   u32 last_id = 0;
 
@@ -572,35 +572,29 @@ void update_region_annotations(struct queue_entry* q)
       unsigned int state_count;
       q->regions[i].state_sequence = (*extract_response_codes)(response_buf, response_bytes[i], &state_count);
 
+
+      // for (j=0; j<state_count; j++) {
+        // ACTF("[update_region_annotattions] region.state_sequence: %d", q->regions[i].state_sequence[j]);
+      // }
+
       q->regions[i].state_count = state_count;
     }
   }
   
 
-  u32 cur_state_count = q->regions[messages_sent-1].state_count;
-
-
-  // for ( j=0; j<q->region_count; j++ ) {
-  //   ACTF("[region] state_count %d ", q->regions[j].state_count);
-  // }
-  // ACTF("[update_region_annotattions] q->region: %d", q->region_count);
-  // ACTF("[update_region_annotattions] cur_state_count: %d", cur_state_count);
-  // ACTF("[update_region_annotations] first_id %d, last_id %d", q->regions[messages_sent-1].state_sequence[1], q->regions[messages_sent-1].state_sequence[cur_state_count-1]);
-  // PFATAL("STOP");
-
   // Favored add 
-  if (cur_state_count != 0 && messages_sent == cur_state_count-1 && cur_queue_first_id != 0 && cur_queue_last_id != 0 && messages_sent > 2) {    
-    
-    first_id = q->regions[messages_sent-1].state_sequence[1];
-    last_id = q->regions[messages_sent-1].state_sequence[cur_state_count-1];
+  if (target_state_id != 0 && cur_queue_first_id != 0 && cur_queue_last_id != 0 && messages_sent > 2) {    
+    first_id = q->regions[0].state_sequence[q->regions[0].state_count];
+    last_id = q->regions[messages_sent-1].state_sequence[q->regions[messages_sent-1].state_count];
 
     if ( first_id == cur_queue_first_id && last_id == cur_queue_last_id ) {
       q->favored = 1;
-      // ACTF("[update region] Mark queue id %d as favored", q->index);
-      // ACTF("[update region] cur queue first id %d, last id %d", cur_queue_first_id, cur_queue_last_id);
-      // u8 *temp_str = state_sequence_to_string(q->regions[messages_sent-1].state_sequence, q->regions[messages_sent-1].state_count);
-      // ACTF("[update region] state sequenece %s", temp_str);
-      // PFATAL("FIND!!!");
+      ACTF("[update region] Mark queue id %d as favored", q->index);
+      ACTF("[update region] cur queue first id %d, last id %d", cur_queue_first_id, cur_queue_last_id);
+      u8 *temp_str = state_sequence_to_string(q->regions[messages_sent-1].state_sequence, q->regions[messages_sent-1].state_count);
+      ACTF("[update region] state sequenece %s", temp_str);
+      
+      PFATAL("STOP!!");
     }
   }
 
@@ -871,6 +865,8 @@ int get_if_sequence_interesting(struct queue_entry *q)
   // u8 *temp_str = state_sequence_to_string(state_sequence, state_count);
   // ACTF("[update_state_aware_variables] return temp_str: %s", temp_str);
   // ACTF("[update_state_aware_variables] region_count: %d\n", q->region_count);
+
+  // ACTF("[get_if_sequence_interesting] state_coverage_level: %d", state_coverage_level);
   // ACTF("[get_if_sequence_interesting] region %d, state: %d", q->region_count, state_count);
 
   // level 2 state loop 只允許 2 次 -> 相似度
@@ -883,6 +879,17 @@ int get_if_sequence_interesting(struct queue_entry *q)
     flag = 0;
   }
   
+
+  // if ( state_coverage_level == 6 ) {
+  //   // 最原始
+  //   if ( flag == 0 ) {
+  //     flag = 0;
+  //   }
+  //   else {
+  //     flag = 1;
+  //   }
+  // }
+
 
   //Free state sequence
   if (state_sequence) ck_free(state_sequence);
@@ -1124,24 +1131,22 @@ void update_state_aware_variables(struct queue_entry *q, u8 dry_run)
 
   
   if (!dry_run) {
-    // k = kh_get(hms, khms_states, target_state_id);
-    // if (k != kh_end(khms_states)) {
-    //   kh_val(khms_states, k)->paths_discovered++;
-    // }      
-
+    k = kh_get(hms, khms_states, target_state_id);
+    if (k != kh_end(khms_states)) {
+      kh_val(khms_states, k)->paths_discovered++;
+    }      
     // if ( target_state_id == 0 ) {
     //   k = kh_get(hms, khms_states, target_state_id);
     //   if (k != kh_end(khms_states)) {
     //     kh_val(khms_states, k)->paths_discovered++;
     //   }        
     // }
-
-    if (cur_queue_first_id == state_sequence[1] && cur_queue_last_id == state_sequence[state_count-1] ) {
-      k = kh_get(hms, khms_states, target_state_id);
-      if (k != kh_end(khms_states)) {
-        kh_val(khms_states, k)->paths_discovered++;
-      }
-    }
+    // else if (cur_queue_first_id == state_sequence[0] && cur_queue_last_id == state_sequence[state_count-1] ) {
+    //   k = kh_get(hms, khms_states, target_state_id);
+    //   if (k != kh_end(khms_states)) {
+    //     kh_val(khms_states, k)->paths_discovered++;
+    //   }
+    // }
   }
 
 
@@ -6118,12 +6123,10 @@ AFLNET_REGIONS_SELECTION:;
   if (state_aware_mode) {
     /* In state aware mode, select M2 based on the targeted state ID */
     u32 total_region = queue_cur->region_count;
-    u32 queue_cur_total_state_count = queue_cur->regions[total_region-1].state_count;
-
     if (total_region == 0) PFATAL("0 region found for %s", queue_cur->fname);
     
     // ACTF("[fuzz_one] target_state_id: %d",  target_state_id );
-  
+    // ACTF("[fuzz_one] queue_cur->region_count: %d",  queue_cur->region_count);
 
 
     if (target_state_id == 0) {
@@ -6138,16 +6141,12 @@ AFLNET_REGIONS_SELECTION:;
         M2_region_count++;
       }
 
-      // u32 j = 0;
-      // for (j=0; j<queue_cur_total_state_count; j++) {
-      //   ACTF("[fuzz_one] region.state_sequence: %d", queue_cur->regions[total_region-1].state_sequence[j]);
-      // }      
       
-      if ( queue_cur_total_state_count >= 3 ) {
-        cur_queue_first_id = queue_cur->regions[total_region-1].state_sequence[1];
-        cur_queue_last_id = queue_cur->regions[total_region-1].state_sequence[queue_cur_total_state_count-1];
-        // ACTF("[fuzz_one] first: %d, last:%d", cur_queue_first_id, cur_queue_last_id);        
-      }
+      // u32 first_id_count = queue_cur->regions[queue_cur->region_count-1].state_count;
+      // cur_queue_last_id = queue_cur->regions[queue_cur->region_count-1].state_sequence[first_id_count - 1];
+
+      // ACTF("[fuzz_one] not first, last:%d", cur_queue_last_id);
+
 
     } else {
       //M1 is unlikely to be empty
@@ -6170,12 +6169,21 @@ AFLNET_REGIONS_SELECTION:;
         }
       }
 
-      // u32 first_id_count = 0;
-      // u32 last_id_count = 0;
+      u32 first_id_count = 0;
+      u32 last_id_count = 0;
 
-      if ( queue_cur_total_state_count > 2 ) {
-        cur_queue_first_id = queue_cur->regions[total_region-1].state_sequence[1];
-        cur_queue_last_id = queue_cur->regions[total_region-1].state_sequence[queue_cur_total_state_count-1];
+      if ( queue_cur->region_count > 2 ) {
+
+        first_id_count = queue_cur->regions[0].state_count;
+        last_id_count = queue_cur->regions[queue_cur->region_count-1].state_count;
+
+        if ( first_id_count != 0) {
+          cur_queue_first_id = queue_cur->regions[0].state_sequence[first_id_count - 1];
+        }
+        
+        if (last_id_count != 0) {
+          cur_queue_last_id = queue_cur->regions[queue_cur->region_count-1].state_sequence[last_id_count - 1];              
+        }
       }
 
       // u32 first_id_count = queue_cur->regions[0].state_count;

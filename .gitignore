@@ -12,6 +12,7 @@ aflnet-showmap
 aflnet-showmap-nwe
 afl-tmin
 aflnet-replay
+aflnet-replay-simple
 aflnet.o
 as
 
